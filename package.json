@@ -9,18 +9,22 @@
     "build-ts": "tsc",
     "serve": "node dist/server.js",
     "build": "npm run build-ts",
-    "start": "npm run build && npm run serve",
-    "watch-server": "nodemon --watch 'src/**/*' -e ts,tsx --exec ts-node src/server.ts"
+    "start": "npm run build-ts && npm run serve",
+    "watch-server": "nodemon --watch 'src/**/*' -e ts,tsx --exec npm start"
   },
   "dependencies": {
     "@types/koa": "^2.13.3",
     "@types/koa-router": "^7.4.2",
+    "@types/node": "^15.12.2",
     "datastore-level": "^5.0.1",
+    "ipfs": "^0.55.3",
     "ipfs-http-client": "^50.1.1",
+    "ipld-dag-pb": "^0.22.2",
     "koa": "^2.13.1",
     "koa-router": "^10.0.0",
     "multibase": "^4.0.4",
     "orbit-db": "^0.26.1",
+    "orbit-db-identity-provider": "^0.4.0",
     "path-to-regexp": "^6.2.0"
   },
   "devDependencies": {

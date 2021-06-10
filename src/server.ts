@@ -1,14 +1,19 @@
-import * as Koa from 'koa';
-import * as Router from 'koa-router';
-import { pathToRegexp, match, parse, compile } from 'path-to-regexp';
+import Koa from 'koa';
+import Router from 'koa-router';
+
+import Headers from './middleware/headers';
+import RouterRegister from './router/index';
+import GlobalVariablesRegister from './middleware/global'
+
+// Constellation
 
 const app = new Koa();
 const router = new Router();
-
-router.get("/:id", async (ctx) => {
-    ctx.body = 'Hello World!';
-});
-
+RouterRegister(router);
+app.use(Headers);
 app.use(router.routes());
 
-app.listen(8000);
+GlobalVariablesRegister(app).then(() => {
+    console.log("App start, listening at :8000")
+    app.listen(8000);
+})
