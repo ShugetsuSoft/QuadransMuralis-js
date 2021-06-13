@@ -1,4 +1,5 @@
 import OrbitDB from 'orbit-db';
+import OrbitTools from '../utils/db'
 
 class QmStore {
     database: any;
@@ -8,6 +9,10 @@ class QmStore {
     constructor(database: any) {
         this.database = database;
         this.store = null
+    }
+
+    structConvertor(store) {
+        
     }
 }
 
@@ -103,13 +108,30 @@ class QmUserStore extends QmStore implements QmUser {
     id: string;
     createDate: string;
     uploadDate: string;
-    profile: QmUser["profile"];
+    profile: {
+        name: string;
+        avatar: string;
+        bio: string;
+        background?: string;
+        tags?: string[];
+    };
     illusts: QmIllust[];
+
+    convertList = {
+        "id": "store.address.path",
+        "createDate": "createDate",
+        "uploadDate": "uploadDate",
+        "name": "profile.name",
+        "avatar": "profile.avatar",
+        "bio": "profile.bio",
+        "background?": "profile.background",
+        "tags": "profile.tags",
+        "illusts": "return"
+    }
 
     constructor(database: any, address: string) {
         super(database);
         this.address = address;
-        this.illustsStore = null;
     }
 
     async openStore() {
@@ -122,15 +144,13 @@ class QmUserStore extends QmStore implements QmUser {
                     replicate: true
                 }
             })
-        }else if(OrbitDB.isValidAddress(this.address)) {
-            this.store = await this.database.keyvalue(this.address)
         }else{
             return false;
         }
-        this.store.events.on("replicated", (address) => {
-            this.loadProfile()
-        })
-        await this.store.load();
+        //this.store.events.on("replicated", () => {
+        //    this.loadProfile()
+        //})
+        //await this.store.load();
         return true;
     }
     async load() {
@@ -139,20 +159,7 @@ class QmUserStore extends QmStore implements QmUser {
     }
 
     async loadProfile() {
-        let checkList = [
-            await this.store.get("createDate"),
-            await this.store.get("uploadDate"),
-            await this.store.get("name"),
-            await this.store.get("avatar"),
-            await this.store.get("bio"),
-            await this.store.get("background"),
-            await this.store.get("tags"),
-            await this.store.get("illusts")
-        ]
-        for(let c of checkList) {
-            if(c == undefined) return
-        }
-
+        
         this.id = this.store.address.path;
         this.createDate = await this.store.get("createDate")
         this.uploadDate = await this.store.get("uploadDate")
@@ -184,7 +191,7 @@ class QmUserStore extends QmStore implements QmUser {
         }
         this.illustsStore = await this.database.feed(illustsAddr, illustsOptions)
         await this.illustsStore.load();
-        this.illustsStore.events.on("replicated", (address) => {
+        this.illustsStore.events.on("replicated", () => {
             this.loadIllusts()
         })
     }

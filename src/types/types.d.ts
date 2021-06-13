@@ -36,5 +36,5 @@ interface QmUser extends QmBase {
         tags?: tag[];
     };
 
-    illusts?: QmIllust[];
+    illusts?: QmIllust[] | QmIllustId[];
 }
