@@ -7,6 +7,8 @@ const Register = async (app: Koa) => {
     app.context.ipfs = await ipfsUtils.getIpfsInstance();
     let identity = await orbitUtils.getOribitDBIdentityFromWallet(null)
     app.context.orbitdb = await orbitUtils.getOrbitDBInstance(app.context.ipfs, identity);
+    app.context.usersCache = {}
+    app.context.illustsCache = {}
 }
 
 export default Register;

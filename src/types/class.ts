@@ -1,18 +1,78 @@
 import OrbitDB from 'orbit-db';
 import OrbitTools from '../utils/db'
+import events from 'events'
 
 class QmStore {
     database: any;
     store: any;
     address: string;
     static prefix: string;
+    convertList: object;
+    events = new events.EventEmitter()
+    
+    state: boolean = false
     constructor(database: any) {
         this.database = database;
         this.store = null
     }
 
-    structConvertor(store) {
-        
+    $N(path, value, val) {
+        let pos
+        while(true) {
+            pos = path.indexOf('.')
+            if (pos === -1) {
+                val[path] = value
+                break
+            }
+            if (val[path.substring(0, pos)] == undefined){
+                val[path.substring(0, pos)] = {}
+            }
+            val = val[path.substring(0, pos)]
+            path = path.substring(pos + 1, path.length)
+        }
+    }
+
+    finish() {
+        this.state = true
+    }
+
+    async convertor_kv(store = this.store, convertList = this.convertList, cb = () => this.finish()) {
+        let endpt
+        for (let key in convertList) {
+            let val = await store.get(key)
+            if (val == undefined) {
+                return
+            } else {
+                let conv = convertList[key]
+                if (conv.endsWith("?")) {
+                    endpt = true
+                    conv = conv.substring(0, conv.length - 1)
+                }else{
+                    endpt = false
+                }
+                this.$N(conv, val, this)
+            }
+        }
+        if (endpt) {
+            cb()
+        }
+    }
+
+    async convertor_fe(store = this.store, fedlist = "list", cb = () => this.finish()) {
+        let feeds = []
+        let sign = false
+        for await (let e of store.iterator({ limit: -1 })){
+            let addr = e.payload.value;
+            if(addr == "<start>") {
+                sign = true
+            }else{
+                feeds.push(addr)
+            }
+        }
+        if(sign) {
+            this[fedlist] = feeds
+            cb()
+        }
     }
 }
 
@@ -115,18 +175,20 @@ class QmUserStore extends QmStore implements QmUser {
         background?: string;
         tags?: string[];
     };
-    illusts: QmIllust[];
+    illustsStoreID: QmDBId;
+    illusts: QmIllustId[];
+
+    illustsState: boolean = false
 
     convertList = {
-        "id": "store.address.path",
         "createDate": "createDate",
         "uploadDate": "uploadDate",
         "name": "profile.name",
         "avatar": "profile.avatar",
         "bio": "profile.bio",
-        "background?": "profile.background",
+        "background": "profile.background",
         "tags": "profile.tags",
-        "illusts": "return"
+        "illusts": "illustsStoreID?"
     }
 
     constructor(database: any, address: string) {
@@ -147,74 +209,46 @@ class QmUserStore extends QmStore implements QmUser {
         }else{
             return false;
         }
-        //this.store.events.on("replicated", () => {
-        //    this.loadProfile()
-        //})
-        //await this.store.load();
+        this.store.events.on("replicated", () => {
+            this.loadProfile()
+        })
+        await this.store.load()
+        this.loadProfile()
         return true;
     }
+
     async load() {
         if(!await this.openStore()) return false;
         return true;
     }
 
     async loadProfile() {
-        
         this.id = this.store.address.path;
-        this.createDate = await this.store.get("createDate")
-        this.uploadDate = await this.store.get("uploadDate")
+        this.convertor_kv(this.store, this.convertList, () => this.profileFinish())
+    }
 
-        this.profile = {
-            name: await this.store.get("name"),
-            avatar: await this.store.get("avatar"),
-            bio: await this.store.get("bio")
-        }
-        
-        let background = await this.store.get("background")
-        if(background && background != "") {
-            this.profile.background = background
-        }
-        let tags = await this.store.get("tags")
-        this.profile.tags = tags
-        let illustsAddr = await this.store.get("illusts")
-        let illustsOptions = undefined
-        if(!illustsAddr || illustsAddr == ""){
-            illustsAddr = this.store.address.path + ".illusts",
-            illustsOptions = {
-                accessController: {
-                    write: [
-                        this.address.substr(QmUserStore.prefix.length, this.address.length)
-                    ],
-                    replicate: true
-                }
-            }
-        }
-        this.illustsStore = await this.database.feed(illustsAddr, illustsOptions)
-        await this.illustsStore.load();
+    async profileFinish() {
+        await this.loadIllustsStore()
+        this.state = true
+        this.events.emit("profile_loaded")
+    }
+
+    async loadIllustsStore() {
+        this.illustsStore = await this.database.feed(this.illustsStoreID)
         this.illustsStore.events.on("replicated", () => {
             this.loadIllusts()
         })
+        await this.illustsStore.load()
+        this.loadIllusts()
     }
 
     async loadIllusts() {
-        let illustsAddrCache = []
-        let sign = false
-        for await (let e of this.illustsStore.iterator({ limit: -1 })){
-            let addr = e.payload.value;
-            if(addr == "<start>") {
-                sign = true
-            }else{
-                illustsAddrCache.push(addr)
-            }
-        }
-        if(sign) {
-            for(let addr of illustsAddrCache) {
-                let newStore = new QmIllustStore(this.database, addr)
-                newStore.load()
-                this.illusts.push(newStore)
-            }
-        }
+        await this.convertor_fe(this.illustsStore, "illusts", () => this.illustsFinish())
+    }
 
+    async illustsFinish() {
+        this.illustsState = true
+        this.events.emit("illusts_loaded")
     }
 
     static isValidAddress(address) {

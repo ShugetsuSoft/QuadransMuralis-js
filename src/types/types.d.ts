@@ -1,6 +1,7 @@
 type QmId = string;
 type QmIllustId = QmId;
 type QmUserId = QmId;
+type QmDBId = QmId;
 type FileId = string;
 type tag = string;
 
@@ -36,5 +37,5 @@ interface QmUser extends QmBase {
         tags?: tag[];
     };
 
-    illusts?: QmIllust[] | QmIllustId[];
+    illusts?: QmIllust[] | QmIllustId[] | QmDBId;
 }
